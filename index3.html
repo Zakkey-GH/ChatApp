@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>Firebase:v9:Chatアプリ</title>
+<link rel="stylesheet"  href="./css/style.css" />
+</head>
+<body>
+
+<!-- コンテンツ表示画面 -->
+<div>
+    <div> キャラを選ぶドン </div>
+    <select name="chara" id="uname">
+        <option value="zunda">zunda</option>
+        <option value="voidoll">voidoll</option>
+        <option value="syuji">syuji</option>
+    </select>
+    <div>
+        <textarea id="text" cols="30" rows="10"></textarea>
+        <button id="send">送信</button>
+    </div>
+    <div id="output" stayle="height:300px; overflow:auto; "></div> <div id="image"></div>
+</div>
+
+<!--/ コンテンツ表示画面 -->
+
+
+
+<!-- JQuery -->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<!-- JQuery -->
+
+
+<!--** 以下Firebase **-->
+<script type="module">
+    // Import the functions you need from the SDKs you need
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+    import { getDatabase, ref, push, set, update, onChildAdded, remove, onChildRemoved, onChildChanged } 
+    from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+    // TODO: Add SDKs for Firebase products that you want to use
+    // https://firebase.google.com/docs/web/setup#available-libraries
+  
+    // Your web app's Firebase configuration"
+    const firebaseConfig = {
+        apiKey: "",
+        authDomain: "",
+        databaseURL: "",
+        projectId: "",
+        storageBucket: "",
+        messagingSenderId: "",
+        appId: ""
+    };
+  
+    //★JavaScriptの関数とFirebase側の関数の見分けがわからない
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const dbRef = ref(db,"chat"); //firebaseを作成した時に命名したものが chat 
+
+    //データ登録
+    $("#send").on("click",function(){
+        const msg = {
+            uname:$("#uname").val(),
+            text:$("#text").val()
+        }
+        const id = push(dbRef); //Pushできる状況を作っておく
+        set(id,msg); //DBに値をセットする
+    });
+
+
+// 受信処理
+onChildAdded(dbRef,function(data){
+    const msg = data.val();
+    const key = data.key;
+    let h   = '<p id="'+key+'">';
+          h  += msg.uname;
+          h  += '<img src="./img/bustup-zundamon.webp" alt="" width="50" height="50">';
+          h  += '<br>';
+          h  += '<span contentEditable= "true" id = "'+key+'_update">'+msg.text+' </span>';
+          h  += '<span class="remove" data-key="'+key+'"> 削除</span>';
+          h  += '<span class="update" data-key="'+key+'"> 更新</span>';
+        //   h  += '<span class="read-aloud" data-key="'+key+'"> 読上</span>';
+          h  += '</p>';
+          $("#output").prepend(h);
+
+});
+
+
+$(document).ready(function() {
+        $('#uname').change(function() {
+            const selectedValue = $(this).val();
+            console.log(selectedValue);
+            if (selectedValue === 'zunda') {
+                $('#image').attr('src', './img/bustup-zundamon.webp', 'width="50"','height="50"'); // 画像のパスを指定
+                $('#image').show();
+            } else {
+                $('#image').hide();
+            }
+        });
+    });
+
+
+//削除イベント
+$("#output").on("click", ".remove", function(){
+    const key = $(this).attr("data-key");
+    const remove_item = ref(db,"chat/"+key);
+    remove(remove_item).then(() => { //この構文で削除と更新が動く
+        $("#"+key).remove();
+    });
+});
+
+//更新イベント
+$("#output").on("click", ".update", function(){
+    const key = $(this).attr("data-key");
+    update(ref(db,"chat/"+key),{
+        text: $("#"+key+'_update').html()
+    });
+});
+
+//読み上げイベント
+    // $("#output").on("click", ".read-aloud", function(){
+
+    // });
+
+
+//削除処理がFirebase側で実行されたらイベント発生
+onChildRemoved(dbRef,(data) => {
+    $("#"+data.key).remove();
+});
+
+//更新処理がFirebase側で実行されたらイベント発生
+onChildChanged(dbRef,(data) => {
+    $("#"+data.key+'_update').html(data.val().text);
+    $("#"+data.key+'_update').fadeOut(800).fadeIn(800);
+});
+
+//エンターキー
+$("#text").on("keydown",function(e){
+    if(e.keyCode==13){
+        const msg = {
+            uname : $("#uname").val(),
+            text  : $("#text").val()
+        }
+        const id = push(dbRef);
+        set(id, msg);
+        
+        const readText = msg.text;
+    
+                if (!readText) {
+                    alert("テキストを入力してください");
+                    return;
+                }
+
+                // VOICEVOX APIエンドポイントの設定
+                const speakerId = 3; // ずんだもん（ノーマル） IDは3
+                const audioQueryUrl = `http://localhost:50021/audio_query?text=${encodeURIComponent(readText)}&speaker=${speakerId}`;
+                const synthesisUrl = `http://localhost:50021/synthesis?speaker=${speakerId}`;
+
+                // audio_query APIを使って音声合成の準備
+                $.post(audioQueryUrl, function(queryData) {
+                    // synthesis APIを使って音声データを生成
+                    $.ajax({
+                        url: synthesisUrl,
+                        type: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify(queryData),
+                        xhrFields: {
+                            responseType: 'blob' // Blob形式でレスポンスを受け取る
+                        },
+                        success: function(audioBlob) {
+                            // 音声を再生
+                            const audioUrl = URL.createObjectURL(audioBlob);
+                            const audio = new Audio(audioUrl);
+                            audio.play();
+                        },
+                        error: function(error) {
+                            console.error("エラーが発生しました:", error);
+                            alert("音声合成に失敗しました。VOICEVOXエンジンが起動しているか確認してください。");
+                        }
+                    });
+                }).fail(function(error) {
+                    console.error("エラーが発生しました:", error);
+                    alert("音声合成クエリの生成に失敗しました。");
+                });
+
+
+
+    }
+});
+
+
+
+
+  </script>
+
+ 
+
+
+
+
+
+
+
+
+
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,4 @@
+span:hover {
+    color: blue; /* ホバー時の文字色 */
+    background-color: lightgray; /* ホバー時の背景色 */
+}

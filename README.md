@@ -6,7 +6,8 @@
 
 
 ## ③アプリのデプロイURL
-デプロイしている場合はURLを記入（任意）
+https://gsacademyyy.sakura.ne.jp/js03/kadai/index3.html
+※loginページを抜いています
 
 ## ④アプリのログイン用IDまたはPassword（ある場合）
 - ID: なし
